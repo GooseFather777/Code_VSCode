@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Base64 Encoder</title>
+  <title>Encoder/Hasher/Encryptor</title>
   <style>
     :root {
       --bg: #0f172a;
@@ -26,7 +26,7 @@
     }
     .card {
       width: 100%;
-      max-width: 560px;
+      max-width: 640px;
       background: linear-gradient(180deg, rgba(17,24,39,0.9), rgba(2,6,23,0.9));
       border: 1px solid rgba(148,163,184,0.2);
       border-radius: 16px;
@@ -39,9 +39,9 @@
       font-size: 22px;
       letter-spacing: 0.3px;
     }
-    p { margin: 0 0 20px 0; color: var(--muted); }
+    p { margin: 0 0 18px 0; color: var(--muted); }
     label { display: block; margin-bottom: 6px; font-size: 14px; }
-    input {
+    input, select {
       width: 100%;
       padding: 12px 14px;
       margin-bottom: 14px;
@@ -52,7 +52,10 @@
       font-size: 15px;
       outline: none;
     }
-    input:focus { border-color: var(--accent-2); box-shadow: 0 0 0 3px rgba(6,182,212,0.2); }
+    input:focus, select:focus {
+      border-color: var(--accent-2);
+      box-shadow: 0 0 0 3px rgba(6,182,212,0.2);
+    }
     button {
       width: 100%;
       padding: 12px 14px;
@@ -72,20 +75,99 @@
       border-radius: 10px;
       word-break: break-all;
       min-height: 48px;
+      white-space: pre-wrap;
+      font-family: "IBM Plex Mono", Consolas, monospace;
+      font-size: 13px;
     }
     .muted { color: var(--muted); font-size: 13px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>Base64 из логина и пароля</h1>
-    <p>Введите логин и пароль — сервис вернет base64 для строки `login:password`.</p>
+    <h1>Кодирование/Хэш/Шифрование</h1>
+    <p>Строка `login:password` преобразуется выбранным способом.</p>
 
-    <label for="login">Логин</label>
-    <input id="login" type="text" placeholder="user" autocomplete="username" />
+    <div class="row">
+      <div>
+        <label for="login">Логин</label>
+        <input id="login" type="text" placeholder="user" autocomplete="username" />
+      </div>
+      <div>
+        <label for="password">Пароль</label>
+        <input id="password" type="password" placeholder="secret" autocomplete="current-password" />
+      </div>
+    </div>
 
-    <label for="password">Пароль</label>
-    <input id="password" type="password" placeholder="secret" autocomplete="current-password" />
+    <div class="row">
+      <div>
+        <label for="mode">Режим</label>
+        <select id="mode">
+          <option value="encode" selected>Кодирование</option>
+          <option value="hash">Хэш</option>
+          <option value="encrypt">Шифрование</option>
+        </select>
+      </div>
+      <div>
+        <label for="encoding">Кодировка входа</label>
+        <select id="encoding">
+          <option value="utf8" selected>UTF-8 (рекомендуется)</option>
+          <option value="utf16le">UTF-16LE</option>
+          <option value="latin1">Latin-1</option>
+          <option value="ascii">ASCII</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row" id="encode-options">
+      <div>
+        <label for="output">Выход</label>
+        <select id="output">
+          <option value="base64" selected>Base64</option>
+          <option value="base64url">Base64URL</option>
+          <option value="hex">Hex</option>
+          <option value="url">URL Encode</option>
+        </select>
+      </div>
+      <div></div>
+    </div>
+
+    <div class="row hidden" id="hash-options">
+      <div>
+        <label for="hash">Алгоритм хэша</label>
+        <select id="hash">
+          <option value="sha256" selected>SHA-256</option>
+          <option value="sha1">SHA-1</option>
+          <option value="md5">MD5</option>
+        </select>
+      </div>
+      <div></div>
+    </div>
+
+    <div class="row hidden" id="encrypt-options">
+      <div>
+        <label for="cipher">Шифр</label>
+        <select id="cipher">
+          <option value="aes-256-gcm" selected>AES-256-GCM</option>
+        </select>
+      </div>
+      <div>
+        <label for="passphrase">Парольная фраза</label>
+        <input id="passphrase" type="password" placeholder="passphrase" />
+      </div>
+    </div>
+
+    <div class="row hidden" id="encrypt-advanced">
+      <div>
+        <label for="salt">Salt (base64, опц.)</label>
+        <input id="salt" type="text" placeholder="base64" />
+      </div>
+      <div>
+        <label for="iv">IV (base64, опц.)</label>
+        <input id="iv" type="text" placeholder="base64" />
+      </div>
+    </div>
 
     <button id="submit">Сгенерировать</button>
 
@@ -99,6 +181,31 @@
     const resultEl = document.getElementById("result");
     const errorEl = document.getElementById("error");
 
+    const modeEl = document.getElementById("mode");
+    const encodingEl = document.getElementById("encoding");
+    const outputEl = document.getElementById("output");
+    const hashEl = document.getElementById("hash");
+    const cipherEl = document.getElementById("cipher");
+    const passphraseEl = document.getElementById("passphrase");
+    const saltEl = document.getElementById("salt");
+    const ivEl = document.getElementById("iv");
+
+    const encodeOptions = document.getElementById("encode-options");
+    const hashOptions = document.getElementById("hash-options");
+    const encryptOptions = document.getElementById("encrypt-options");
+    const encryptAdvanced = document.getElementById("encrypt-advanced");
+
+    function updateVisibility() {
+      const mode = modeEl.value;
+      encodeOptions.classList.toggle("hidden", mode !== "encode");
+      hashOptions.classList.toggle("hidden", mode !== "hash");
+      encryptOptions.classList.toggle("hidden", mode !== "encrypt");
+      encryptAdvanced.classList.toggle("hidden", mode !== "encrypt");
+    }
+
+    modeEl.addEventListener("change", updateVisibility);
+    updateVisibility();
+
     document.getElementById("submit").addEventListener("click", async () => {
       errorEl.textContent = "";
       resultEl.textContent = "";
@@ -111,11 +218,29 @@
         return;
       }
 
+      const payload = {
+        login,
+        password,
+        encoding: encodingEl.value,
+        mode: modeEl.value
+      };
+
+      if (payload.mode === "encode") {
+        payload.output = outputEl.value;
+      } else if (payload.mode === "hash") {
+        payload.hash = hashEl.value;
+      } else if (payload.mode === "encrypt") {
+        payload.cipher = cipherEl.value;
+        payload.passphrase = passphraseEl.value;
+        if (saltEl.value.trim()) payload.salt = saltEl.value.trim();
+        if (ivEl.value.trim()) payload.iv = ivEl.value.trim();
+      }
+
       try {
         const res = await fetch("/encode", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ login, password })
+          body: JSON.stringify(payload)
         });
 
         const data = await res.json();
@@ -124,7 +249,11 @@
           return;
         }
 
-        resultEl.textContent = data.base64;
+        if (data.mode === "encrypt") {
+          resultEl.textContent = JSON.stringify(data, null, 2);
+        } else {
+          resultEl.textContent = data.result;
+        }
       } catch (err) {
         errorEl.textContent = "Не удалось связаться с сервером";
       }
