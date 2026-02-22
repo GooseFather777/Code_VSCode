@@ -1,0 +1,13 @@
+﻿{
+  "name": "base64-service",
+  "version": "1.0.0",
+  "description": "Simple web service to generate base64 from login and password",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
